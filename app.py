@@ -10,68 +10,68 @@ USER_AGENT = "COTD-dev-tracker / waxy89@personal-project"
 BASE_URL = "https://trackmania.io/api"
 HEADERS = {"User-Agent": USER_AGENT}
 
-st.set_page_config(page_title="COTD & Rerun Progress", layout="wide", page_icon="🏎️")
+st.set_page_config(page_title="COTD & Rerun Progress", layout="wide")
 
 st.markdown("""
 <style>
-    .stApp {
-        background: linear-gradient(180deg, #0a0a1a 0%, #0d1117 50%, #0a0a1a 100%);
-    }
-    .main-title {
-        text-align: center;
-        font-size: 2.5em;
-        font-weight: bold;
-        background: linear-gradient(90deg, #FFD700, #FF6B35, #FF2200);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-style: italic;
-        margin-bottom: 0;
-    }
-    .player-card {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-        border: 1px solid #2a2a4a;
-        border-radius: 15px;
-        padding: 20px;
-        margin: 10px 0;
-    }
-    .player-name {
-        font-size: 1.8em;
-        font-weight: bold;
-        color: #ffffff;
-        margin: 0;
-    }
-    .player-tag {
-        color: #4CAF50;
-        font-size: 0.9em;
-    }
-    .stat-card {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-        border: 1px solid #2a2a4a;
-        border-radius: 12px;
-        padding: 15px;
-        text-align: center;
-    }
-    .stat-icon {
-        font-size: 1.5em;
-        margin-bottom: 5px;
-    }
-    .stat-label {
-        color: #888;
-        font-size: 0.8em;
-        text-transform: uppercase;
-    }
-    .stat-value {
-        font-size: 1.8em;
-        font-weight: bold;
-        color: #FFD700;
-    }
-    .chart-container {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-        border: 1px solid #2a2a4a;
-        border-radius: 15px;
-        padding: 15px;
-        margin: 15px 0;
-    }
+.stApp {
+    background: linear-gradient(180deg, #0a0a1a 0%, #0d1117 50%, #0a0a1a 100%);
+}
+.main-title {
+    text-align: center;
+    font-size: 2.5em;
+    font-weight: bold;
+    background: linear-gradient(90deg, #FFD700, #FF6B35, #FF2200);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-style: italic;
+    margin-bottom: 0;
+}
+.player-card {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid #2a2a4a;
+    border-radius: 15px;
+    padding: 20px;
+    margin: 10px 0;
+}
+.player-name {
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #ffffff;
+    margin: 0;
+}
+.player-tag {
+    color: #4CAF50;
+    font-size: 0.9em;
+}
+.stat-card {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+    padding: 15px;
+    text-align: center;
+}
+.stat-icon {
+    font-size: 1.5em;
+    margin-bottom: 5px;
+}
+.stat-label {
+    color: #888;
+    font-size: 0.8em;
+    text-transform: uppercase;
+}
+.stat-value {
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #FFD700;
+}
+.chart-box {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid #2a2a4a;
+    border-radius: 15px;
+    padding: 15px;
+    margin: 15px 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -190,7 +190,6 @@ def process_dataframe(results):
 
 
 st.markdown('<p class="main-title">COTD & RERUN PROGRESS</p>', unsafe_allow_html=True)
-st.markdown("")
 
 with st.sidebar:
     username_input = st.text_input("Spelarnamn", value="Waxyhaxxy")
@@ -198,7 +197,6 @@ with st.sidebar:
     show_reruns = st.checkbox("Visa Reruns", value=True)
     max_pages_limit = st.slider("Max sidor", 1, 500, 50)
     window_size = st.slider("Glidande medelvarde", 1, 50, 10)
-    metric_choice = st.radio("Metrik", ["Division", "Global Rank", "Percentil"])
 
 if not username_input:
     st.stop()
@@ -210,12 +208,7 @@ if not player_id:
     st.error("Hittade ingen spelare: " + username_input)
     st.stop()
 
-st.markdown("""
-<div class="player-card">
-    <p class="player-name">🇸🇪 """ + display_name + """</p>
-    <p class="player-tag">&#9989; Trackmania Competitor</p>
-</div>
-""", unsafe_allow_html=True)
+st.markdown('<div class="player-card"><p class="player-name">' + display_name + '</p><p class="player-tag">Trackmania Competitor</p></div>', unsafe_allow_html=True)
 
 progress_bar = st.progress(0, text="Startar...")
 results = fetch_cotd_history(player_id, max_pages_limit, progress_bar)
@@ -244,57 +237,26 @@ pct = dfv["percentile"].mean() if "percentile" in dfv.columns and dfv["percentil
 
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    st.markdown("""<div class="stat-card">
-        <div class="stat-icon">🏆</div>
-        <div class="stat-label">Total COTDs</div>
-        <div class="stat-value">""" + str(len(dfv)) + """</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown('<div class="stat-card"><div class="stat-icon">&#127942;</div><div class="stat-label">Total COTDs</div><div class="stat-value">' + str(len(dfv)) + '</div></div>', unsafe_allow_html=True)
 with c2:
-    st.markdown("""<div class="stat-card">
-        <div class="stat-icon">🥇</div>
-        <div class="stat-label">Best Division</div>
-        <div class="stat-value">#""" + str(int(dfv["div"].min())) + """</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown('<div class="stat-card"><div class="stat-icon">&#129351;</div><div class="stat-label">Best Division</div><div class="stat-value">#' + str(int(dfv["div"].min())) + '</div></div>', unsafe_allow_html=True)
 with c3:
-    st.markdown("""<div class="stat-card">
-        <div class="stat-icon">📊</div>
-        <div class="stat-label">Avg. Placement</div>
-        <div class="stat-value">""" + str(round(dfv["div"].mean(), 1)) + """</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown('<div class="stat-card"><div class="stat-icon">&#128202;</div><div class="stat-label">Avg. Placement</div><div class="stat-value">' + str(round(dfv["div"].mean(), 1)) + '</div></div>', unsafe_allow_html=True)
 with c4:
-    st.markdown("""<div class="stat-card">
-        <div class="stat-icon">📈</div>
-        <div class="stat-label">Percentil</div>
-        <div class="stat-value">Top """ + str(round(pct, 1)) + """%</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown('<div class="stat-card"><div class="stat-icon">&#128200;</div><div class="stat-label">Percentil</div><div class="stat-value">Top ' + str(round(pct, 1)) + '%</div></div>', unsafe_allow_html=True)
 
-if metric_choice == "Division":
-    y_col = "div"
-    rev = True
-elif metric_choice == "Global Rank":
-    y_col = "rank"
-    rev = True
-else:
-    y_col = "percentile"
-    rev = False
+y_col = "div"
+rev = True
 
 dfv = dfv.sort_values("timestamp").reset_index(drop=True)
 dfv["MA"] = dfv[y_col].rolling(window=window_size, min_periods=1).mean()
 
-st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+st.markdown('<div class="chart-box">', unsafe_allow_html=True)
 
 fig = go.Figure()
 
-for label, min_r, max_r, color in [("1-10", 0, 10, "#FFD700"), ("11-30", 10, 30, "#FFA500"), ("31-50", 30, 50, "#FF4444"), ("51+", 50, 9999, "#AA0000")]:
-    if label == "1-10":
-        mask = dfv["div_rank"] <= 10
-    elif label == "11-30":
-        mask = (dfv["div_rank"] > 10) & (dfv["div_rank"] <= 30)
-    elif label == "31-50":
-        mask = (dfv["div_rank"] > 30) & (dfv["div_rank"] <= 50)
-    else:
-        mask = dfv["div_rank"] > 50
-    s = dfv[mask]
+for label, color, filt in [("1-10", "#FFD700", dfv["div_rank"] <= 10), ("11-30", "#FFA500", (dfv["div_rank"] > 10) & (dfv["div_rank"] <= 30)), ("31-50", "#FF4444", (dfv["div_rank"] > 30) & (dfv["div_rank"] <= 50)), ("51+", "#AA0000", dfv["div_rank"] > 50)]:
+    s = dfv[filt]
     if s.empty:
         continue
     fig.add_trace(go.Scatter(
@@ -307,46 +269,28 @@ for label, min_r, max_r, color in [("1-10", 0, 10, "#FFD700"), ("11-30", 10, 30,
 fig.add_trace(go.Scatter(
     x=dfv["timestamp"], y=dfv["MA"], mode="lines", name="Trend",
     line=dict(color="#FF2200", width=3),
-    hovertemplate="Trend: %{y:.1f}<extra></extra>",
 ))
 
 fig.update_layout(
-    title=dict(
-        text="Division Over Time",
-        font=dict(size=22, color="#ffffff"),
-        x=0.02,
-    ),
+    title=dict(text="Division Over Time", font=dict(size=20, color="#ffffff"), x=0.02),
     template="plotly_dark",
     height=500,
-    xaxis=dict(
-        showgrid=True,
-        gridcolor="rgba(255,255,255,0.05)",
-        title="",
-    ),
-    yaxis=dict(
-        title="Division",
-        showgrid=True,
-        gridcolor="rgba(255,255,255,0.1)",
-    ),
-    legend=dict(
-        orientation="h",
-        yanchor="top",
-        y=-0.08,
-        xanchor="center",
-        x=0.5,
-        font=dict(size=13, color="#cccccc"),
-    ),
+    xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", title=""),
+    yaxis=dict(title="Division", showgrid=True, gridcolor="rgba(255,255,255,0.1)"),
+    legend=dict(orientation="h", yanchor="top", y=-0.08, xanchor="center", x=0.5, font=dict(size=13)),
     plot_bgcolor="rgba(10,10,30,0.8)",
     paper_bgcolor="rgba(0,0,0,0)",
     margin=dict(l=50, r=20, t=50, b=60),
-    hovermode="closest",
 )
-
-if rev:
-    fig.update_yaxes(autorange="reversed")
+fig.update_yaxes(autorange="reversed")
 
 st.plotly_chart(fig, use_container_width=True)
 st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown("### Matches")
+recent = dfv.nlargest(10, "timestamp")[["id", "date_str", "name", "div", "rank", "div_rank", "type"]].copy()
+recent.columns = ["ID", "Start time", "Cup", "Div", "Rank", "Div Rank", "Type"]
+st.dataframe(recent, hide_index=True, use_container_width=True)
 
 with st.expander("Visa all data"):
     st.dataframe(
