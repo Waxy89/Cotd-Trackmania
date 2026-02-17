@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-USER_AGENT = "COTD_Tracker_App/1.0"
+USER_AGENT = "COTD-dev-tracker / waxy89@personal-project"
 BASE_URL = "https://trackmania.io/api"
 HEADERS = {"User-Agent": USER_AGENT}
 
@@ -60,7 +60,7 @@ def fetch_cotd_history(player_id, max_pages, progress_bar):
             min((page + 1) / max_pages, 0.99),
             text="Hamtar sida " + str(page + 1) + " / " + str(max_pages)
         )
-        url = BASE_URL + "/player/" + player_id + "/cotd?page=" + str(page)
+        url = BASE_URL + "/player/" + player_id + "/cotd/" + str(page)
         try:
             resp = requests.get(url, headers=HEADERS, timeout=15)
         except requests.RequestException:
@@ -78,9 +78,11 @@ def fetch_cotd_history(player_id, max_pages, progress_bar):
         except ValueError:
             break
         if page == 0:
-            st.write("DEBUG API-svar:", data)
+            st.write("STATUS:", resp.status_code)
+            st.write("KEYS:", list(data.keys()) if isinstance(data, dict) else type(data))
+            st.write("COTDS:", "cotds" in data if isinstance(data, dict) else "not dict")
         if isinstance(data, dict):
-            cotds = data.get("cotds", data.get("results", []))
+            cotds = data.get("cups", data.get("cotds", data.get("results", [])))
         elif isinstance(data, list):
             cotds = data
         else:
@@ -98,7 +100,7 @@ def fetch_cotd_history(player_id, max_pages, progress_bar):
                 "rank": entry.get("rank", None),
                 "div_rank": entry.get("divrank", entry.get("div_rank", None)),
                 "score": entry.get("score", 0),
-                "total_players": entry.get("totalplayers", entry.get("total_players", None)),
+                "total_players": entry.get("totalplayers", None),
             })
         time.sleep(0.3)
     progress_bar.progress(1.0, text="Klar!")
@@ -209,13 +211,13 @@ fig.add_trace(go.Scatter(
     x=dfv["timestamp"], y=dfv["MA"], mode="lines", name="Trend",
     line=dict(color="white", width=3),
 ))
-fig.update_layout(title=display_name + " - " + metric_choice, template="plotly_dark", height=500)
+fig.update_layout(title=display_name + " - " + metric_choice, template="plotly_dark", height=650)
 if rev:
     fig.update_yaxes(autorange="reversed")
 st.plotly_chart(fig, use_container_width=True)
 
 with st.expander("Visa all data"):
     st.dataframe(
-        dfv[["date_str", "name", "type", "div", "rank"]].sort_values("timestamp", ascending=False),
+                dfv[["date_str", "name", "type", "div", "rank"]].sort_values("date_str", ascending=False),
         hide_index=True,
     )
