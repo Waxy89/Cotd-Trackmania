@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COTD & Rerun Progress – Waxyhaxxy</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Exo+2:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --surface2: #1e1e1e;
+    --border: #2a2a2a;
+    --text: #e8e8e8;
+    --muted: #888;
+    --gold: #f5a623;
+    --green: #4caf50;
+    --red: #e53935;
+    --orange: #ff7b00;
+    --yellow: #ffd600;
+    --blue: #1976d2;
+    --blue-light: #42a5f5;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+
+  /* TOP BAR */
+  .topbar {
+    background: #0a0a0a;
+    border-bottom: 1px solid #222;
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .topbar-logo {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 1px;
+  }
+  .topbar-logo span { color: var(--blue-light); }
+
+  /* HEADER BANNER */
+  .hero {
+    position: relative;
+    overflow: hidden;
+    padding: 28px 24px 20px;
+    background: linear-gradient(135deg, #0d0d0d 0%, #1a0a00 50%, #0d0d0d 100%);
+    text-align: center;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse 80% 60% at 50% 50%, rgba(255,120,0,0.12) 0%, transparent 70%),
+      linear-gradient(90deg, transparent 0%, rgba(255,80,0,0.08) 30%, rgba(255,200,0,0.1) 50%, rgba(80,255,0,0.08) 70%, transparent 100%);
+  }
+  /* Speed lines */
+  .hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 60px,
+      rgba(255,120,0,0.03) 61px,
+      rgba(255,120,0,0.03) 62px
+    );
+  }
+  .hero-title {
+    position: relative;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 38px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #fff;
+    text-shadow: 0 0 40px rgba(255,100,0,0.5);
+  }
+  .hero-title .amp { color: #fff; }
+  .hero-title .rerun { color: #ff4500; text-shadow: 0 0 20px rgba(255,69,0,0.8); }
+  .hero-title .progress { color: #4cff00; text-shadow: 0 0 20px rgba(76,255,0,0.8); }
+
+  /* CONTAINER */
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+  /* PLAYER CARD */
+  .player-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 0 16px;
+  }
+  .flag {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #006aa7 50%, #fecc02 50%);
+    border: 2px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    overflow: hidden;
+  }
+  .player-info h2 {
+    font-size: 26px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .player-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--blue-light);
+    font-size: 13px;
+    margin-top: 2px;
+  }
+  .player-badge::before { content: '✔'; color: var(--blue-light); font-size: 12px; }
+
+  /* STAT CARDS */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+  .stat-card.cotd { border-color: #8b3a00; }
+  .stat-card.cotd::before { background: var(--gold); }
+  .stat-card.division { border-color: #4a3a00; }
+  .stat-card.division::before { background: var(--yellow); }
+  .stat-card.placement { border-color: #1a3a1a; }
+  .stat-card.placement::before { background: var(--green); }
+  .stat-card.percentil { border-color: #1a1a3a; }
+  .stat-card.percentil::before { background: var(--blue-light); }
+
+  .stat-icon { font-size: 28px; }
+  .stat-body label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .stat-body .value {
+    font-size: 28px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1.1;
+  }
+
+  /* CHART SECTION */
+  .chart-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .chart-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 14px;
+  }
+  .chart-wrapper {
+    position: relative;
+    height: 220px;
+  }
+  canvas#divChart { width: 100% !important; }
+
+  /* LEGEND */
+  .chart-legend {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-top: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text);
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+
+  /* MATCHES */
+  .matches-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .matches-header h3 {
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .btn-refresh {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-family: 'Exo 2', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s;
+  }
+  .btn-refresh:hover { background: #1565c0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  thead tr {
+    border-bottom: 2px solid var(--border);
+  }
+  th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  tbody tr {
+    border-bottom: 1px solid #1e1e1e;
+    transition: background 0.15s;
+  }
+  tbody tr:hover { background: #1a1a1a; }
+  td { padding: 12px 12px; color: var(--muted); }
+  td:first-child { color: var(--text); font-weight: 600; }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .status-pending {
+    background: rgba(25, 118, 210, 0.2);
+    color: var(--blue-light);
+    border: 1px solid rgba(25,118,210,0.4);
+  }
+  .status-ongoing {
+    background: rgba(255, 180, 0, 0.2);
+    color: #ffb300;
+    border: 1px solid rgba(255,180,0,0.4);
+  }
+
+  .live-id {
+    color: #ff6b35;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+  }
+
+  .btn-info {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 14px;
+    font-family: 'Exo 2', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .btn-info:hover { background: #1565c0; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="topbar-logo">⬛ TRACKMANIA<span>.IO</span></span>
+</div>
+
+<div class="hero">
+  <h1 class="hero-title">
+    COTD <span class="amp">&amp;</span> <span class="rerun">RERUN</span> <span class="progress">PROGRESS</span>
+  </h1>
+</div>
+
+<div class="container">
+
+  <div class="player-card">
+    <div class="flag">🇸🇪</div>
+    <div class="player-info">
+      <h2>Waxyhaxxy</h2>
+      <div class="player-badge">Trackmania Competitor</div>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card cotd">
+      <div class="stat-icon">🏆</div>
+      <div class="stat-body">
+        <label>Total COTDs</label>
+        <div class="value">586</div>
+      </div>
+    </div>
+    <div class="stat-card division">
+      <div class="stat-icon">🥇</div>
+      <div class="stat-body">
+        <label>Best Division</label>
+        <div class="value">#3</div>
+      </div>
+    </div>
+    <div class="stat-card placement">
+      <div class="stat-icon">📊</div>
+      <div class="stat-body">
+        <label>Avg. Placement</label>
+        <div class="value">34.8</div>
+      </div>
+    </div>
+    <div class="stat-card percentil">
+      <div class="stat-icon">🎯</div>
+      <div class="stat-body">
+        <label>Percentil</label>
+        <div class="value" style="font-size:22px">Top 18.9%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <div class="chart-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Division Over Time</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:12px;color:var(--muted);">Height</span>
+        <input type="range" id="chartHeight" min="120" max="500" value="220" step="10"
+          style="width:120px;accent-color:var(--blue-light);cursor:pointer;">
+        <span id="chartHeightVal" style="font-size:12px;color:var(--muted);min-width:38px;">220px</span>
+      </div>
+    </div>
+    <div class="chart-wrapper" id="chartWrapper">
+      <canvas id="divChart"></canvas>
+    </div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#ffd600"></div>1-10</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ff8c00"></div>11-30</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ff3d00"></div>31-50</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#e53935"></div>51+</div>
+    </div>
+  </div>
+
+  <div class="matches-header">
+    <h3>Matches</h3>
+    <button class="btn-refresh">⟳ Refresh</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Start time</th>
+        <th>Status</th>
+        <th>Live ID</th>
+        <th>Maps</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>14056685</td>
+        <td>6 minutes ago</td>
+        <td><span class="status-badge status-pending">⏳ Pending</span></td>
+        <td><span class="live-id">LTD-MTCH-bobw5oghequvyf</span></td>
+        <td>Winter 2026 - 17</td>
+        <td><button class="btn-info">ℹ Info</button></td>
+      </tr>
+      <tr>
+        <td>14056684</td>
+        <td>6 minutes ago</td>
+        <td><span class="status-badge status-pending">⏳ Pending</span></td>
+        <td><span class="live-id">LTD-MTCH-xjujn14emyh35c</span></td>
+        <td>Winter 2026 - 09</td>
+        <td><button class="btn-info">ℹ Info</button></td>
+      </tr>
+      <tr>
+        <td>14056683</td>
+        <td>6 minutes ago</td>
+        <td><span class="status-badge status-pending">⏳ Pending</span></td>
+        <td><span class="live-id">LTD-MTCH-wbrmhrz1y4nk</span></td>
+        <td>Winter 2026 - 03</td>
+        <td><button class="btn-info">ℹ Info</button></td>
+      </tr>
+      <tr>
+        <td>14056682</td>
+        <td>7 minutes ago</td>
+        <td><span class="status-badge status-pending">⏳ Pending</span></td>
+        <td><span class="live-id">LTD-MTCH-rxt8nnz2zmz1q1cp5</span></td>
+        <td>Winter 2026 - 11</td>
+        <td><button class="btn-info">ℹ Info</button></td>
+      </tr>
+      <tr>
+        <td>14056681</td>
+        <td>7 minutes ago</td>
+        <td><span class="status-badge status-ongoing">⚙ Ongoing</span></td>
+        <td><span class="live-id">LTD-MTCH-k8yuz25l3psngeu</span></td>
+        <td>Winter 2026 - 11</td>
+        <td><button class="btn-info">ℹ Info</button></td>
+      </tr>
+    </tbody>
+  </table>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+// Generate fake division-over-time data from 2021-10 to 2025-01
+// Division starts high (bad = high number), improves over time
+function generateData() {
+  const labels = [];
+  const line = [];
+  const dots = [];
+
+  let current = 60;
+  const start = new Date(2021, 9, 1);
+  const end = new Date(2025, 0, 1);
+  let d = new Date(start);
+
+  while (d <= end) {
+    const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    labels.push(label);
+    // Trend downward (improving) with noise
+    current = Math.max(1, Math.min(75, current + (Math.random() - 0.55) * 8));
+    line.push(Math.round(current));
+    // scatter dot
+    dots.push({ x: labels.length - 1, y: Math.max(1, Math.round(current + (Math.random()-0.5)*15)) });
+    d.setMonth(d.getMonth() + 1);
+  }
+  return { labels, line, dots };
+}
+
+const { labels, line, dots } = generateData();
+
+function dotColor(y) {
+  if (y <= 10) return '#ffd600';
+  if (y <= 30) return '#ff8c00';
+  if (y <= 50) return '#ff3d00';
+  return '#e53935';
+}
+
+const scatterData = dots.map((p, i) => ({ x: i, y: p.y, color: dotColor(p.y) }));
+
+const ctx = document.getElementById('divChart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'scatter',
+  data: {
+    datasets: [
+      {
+        type: 'line',
+        label: 'Division Trend',
+        data: line.map((v, i) => ({ x: i, y: v })),
+        borderColor: '#ffffffcc',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.4,
+        fill: false,
+        order: 1
+      },
+      {
+        type: 'scatter',
+        label: 'Entries',
+        data: scatterData,
+        pointRadius: 4,
+        pointBackgroundColor: scatterData.map(p => p.color),
+        pointBorderColor: 'transparent',
+        order: 2
+      }
+    ]
+  },
+  options: {
+    animation: { duration: 1000 },
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => `Division: ${Math.round(ctx.parsed.y)}`
+        }
+      }
+    },
+    scales: {
+      x: {
+        type: 'linear',
+        min: 0,
+        max: labels.length - 1,
+        ticks: {
+          color: '#888',
+          maxTicksLimit: 5,
+          callback: (val) => {
+            const years = ['2022','2023','2024','2025'];
+            const idx = Math.round(val);
+            const label = labels[idx] || '';
+            const show = years.some(y => label.includes(y.slice(2)));
+            return show ? label.slice(-2) === '22' ? '2022' : label.slice(-2) === '23' ? '2023' : label.slice(-2) === '24' ? '2024' : '2025' : '';
+          }
+        },
+        grid: { color: '#1e1e1e' }
+      },
+      y: {
+        reverse: true,
+        min: 0,
+        max: 80,
+        title: {
+          display: true,
+          text: 'Division',
+          color: '#888',
+          font: { size: 11 }
+        },
+        ticks: {
+          color: '#888',
+          callback: v => [1,10,20,30,50,70].includes(v) ? v : ''
+        },
+        grid: { color: '#1e1e1e' }
+      }
+    }
+  }
+});
+
+// Chart height slider
+const slider = document.getElementById('chartHeight');
+const valLabel = document.getElementById('chartHeightVal');
+const wrapper = document.getElementById('chartWrapper');
+slider.addEventListener('input', () => {
+  const h = slider.value;
+  wrapper.style.height = h + 'px';
+  valLabel.textContent = h + 'px';
+  chart.resize();
+});
+</script>
+</body>
+</html>
