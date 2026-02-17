@@ -196,26 +196,66 @@ else:
 dfv = dfv.sort_values("timestamp").reset_index(drop=True)
 dfv["MA"] = dfv[y_col].rolling(window=window_size, min_periods=1).mean()
 
+def get_rank_color(div_rank):
+    if pd.isna(div_rank):
+        return "#888888"
+    if div_rank <= 10:
+        return "#FFD700"
+    if div_rank <= 50:
+        return "#FFA500"
+    if div_rank <= 50:
+        return "#FF4444"
+    return "#AA0000"
+
+dfv["point_color"] = dfv["div_rank"].apply(get_rank_color)
+
 fig = go.Figure()
-for rt, color in [("Primary", "#00d4ff"), ("Rerun", "#ff6b6b")]:
-    s = dfv[dfv["type"] == rt]
+
+for label, max_r, color in [("1-10", 10, "#FFD700"), ("11-50", 50, "#FFA500"), ("31-50", 50, "#FF4444"), ("51+", 9999, "#AA0000")]:
+    if label == "1-10":
+        mask = dfv["div_rank"] <= 10
+    elif label == "11-50":
+        mask = (dfv["div_rank"] > 10) & (dfv["div_rank"] <= 30)
+    elif label == "31-50":
+        mask = (dfv["div_rank"] > 30) & (dfv["div_rank"] <= 50)
+    else:
+        mask = dfv["div_rank"] > 50
+    s = dfv[mask]
     if s.empty:
         continue
     fig.add_trace(go.Scatter(
-        x=s["timestamp"], y=s[y_col], mode="markers", name=rt,
-        marker=dict(color=color, opacity=0.5, size=6),
-        customdata=s[["name", "div", "rank", "date_str"]].values,
-        hovertemplate="<b>%{customdata[0]}</b><br>Div:%{customdata[1]} Rank:%{customdata[2]}<br>%{customdata[3]}<extra></extra>",
+        x=s["timestamp"], y=s[y_col], mode="markers", name=label,
+        marker=dict(color=color, opacity=0.7, size=7),
+        customdata=s[["name", "div", "rank", "date_str", "div_rank"]].values,
+        hovertemplate="<b>%{customdata[0]}</b><br>Div:%{customdata[1]} Rank:%{customdata[2]}<br>Div Rank:%{customdata[4]}<br>%{customdata[3]}<extra></extra>",
     ))
+
 fig.add_trace(go.Scatter(
     x=dfv["timestamp"], y=dfv["MA"], mode="lines", name="Trend",
-    line=dict(color="white", width=3),
+    line=dict(color="#FF2200", width=3),
 ))
-fig.update_layout(title=display_name + " - " + metric_choice, template="plotly_dark", height=650)
+
+fig.update_layout(
+    title=dict(text="Division Over Time", font=dict(size=24, color="#FF4444")),
+    template="plotly_dark",
+    height=850,
+    xaxis_title="",
+    yaxis_title="Division",
+    legend=dict(
+        orientation="h",
+        yanchor="top",
+        y=-0.05,
+        xanchor="center",
+        x=0.5,
+        font=dict(size=14),
+    ),
+    plot_bgcolor="#1a1a2e",
+    paper_bgcolor="#0d0d1a",
+    hovermode="closest",
+)
 if rev:
     fig.update_yaxes(autorange="reversed")
 st.plotly_chart(fig, use_container_width=True)
-
 with st.expander("Visa all data"):
     st.dataframe(
                 dfv[["date_str", "name", "type", "div", "rank"]].sort_values("date_str", ascending=False),
