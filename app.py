@@ -209,6 +209,19 @@ def get_rank_color(div_rank):
 
 dfv["point_color"] = dfv["div_rank"].apply(get_rank_color)
 
+def get_rank_color(div_rank):
+    if pd.isna(div_rank):
+        return "#888888"
+    if div_rank <= 10:
+        return "#FFD700"
+    if div_rank <= 50:
+        return "#FFA500"
+    if div_rank <= 50:
+        return "#FF4444"
+    return "#AA0000"
+
+dfv["point_color"] = dfv["div_rank"].apply(get_rank_color)
+
 fig = go.Figure()
 
 for label, max_r, color in [("1-10", 10, "#FFD700"), ("11-50", 50, "#FFA500"), ("31-50", 50, "#FF4444"), ("51+", 9999, "#AA0000")]:
