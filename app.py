@@ -1,4 +1,4 @@
-6# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import re
 import time
 import base64
@@ -6,6 +6,7 @@ import requests
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Credentials läses från Streamlit Secrets (Settings → Secrets i Streamlit Cloud)
 # Lägg till detta i dina secrets:
@@ -434,83 +435,91 @@ def fetch_map_info(access_token, map_uid):
     return resp.json() if resp.status_code == 200 else {}
 
 
+def process_one_comp(comp, access_token, player_id):
+    """Process a single competition. Returns a result dict or None if player absent."""
+    name = comp["name"]
+    comp_id = comp["id"]
+    timestamp = pd.to_datetime(comp["startDate"], unit="s", utc=True)
+
+    edition_match = re.search(r"#(\d+)", name)
+    edition_num = int(edition_match.group(1)) if edition_match else 1
+    type_ = "Primary" if edition_num == 1 else "Rerun"
+
+    # STEP 1: Fast participation check (1 request)
+    comp_rank, _ = fetch_competition_leaderboard_position(access_token, comp_id, player_id)
+    if comp_rank is None:
+        return None  # Player didn't participate — skip
+
+    # STEP 2: Rounds
+    rounds = fetch_rounds(access_token, comp_id)
+    if not rounds:
+        return None
+    round_ = rounds[0]
+    round_id = round_["id"]
+    challenge_id = round_.get("qualifierChallengeId")
+
+    # STEP 3: Qual leaderboard — jump to right page using comp_rank hint
+    player_qual, total_players = fetch_qual_leaderboard_for_player(
+        access_token, challenge_id, player_id, approx_rank=comp_rank
+    )
+
+    # STEP 4: Find division match
+    div = None
+    rank = None
+    div_rank = None
+    matches = fetch_matches(access_token, round_id)
+    matches_sorted = sorted(matches, key=lambda m: m.get("position", 0))
+
+    for match in matches_sorted:
+        comp_match_id = match["id"]
+        match_name = match.get("name", "")
+        div_from_name = re.search(r"[Dd]ivision\s*(\d+)", match_name)
+        player_match = fetch_match_results(access_token, comp_match_id, player_id)
+        if player_match:
+            if div_from_name:
+                div = int(div_from_name.group(1))
+            else:
+                div = match.get("position", 0) + 1
+            rank = player_match["rank"]
+            div_rank = player_match["rank"]
+            break
+
+    return {
+        "id": comp_id,
+        "timestamp": timestamp,
+        "name": name,
+        "edition": edition_num,
+        "div": div,
+        "rank": rank,
+        "div_rank": div_rank,
+        "qual_score": player_qual["score"] if player_qual else None,
+        "qual_rank": player_qual["rank"] if player_qual else None,
+        "total_players": total_players,
+        "type": type_
+    }
+
+
 def process_cotd_data(competitions, access_token, oauth_token, player_id, status_text):
     results = []
     total = len(competitions)
+    done = 0
 
-    for i, comp in enumerate(competitions):
-        name = comp["name"]
-        comp_id = comp["id"]
-        timestamp = pd.to_datetime(comp["startDate"], unit="s", utc=True)
-        date_str = timestamp.strftime("%Y-%m-%d")
-
-        edition_match = re.search(r"#(\d+)", name)
-        edition_num = int(edition_match.group(1)) if edition_match else 1
-        type_ = "Primary" if edition_num == 1 else "Rerun"
-
-        status_text.text(f"[{i+1}/{total}] {date_str} {name} …")
-
-        # STEP 1: Fast check — did the player even participate?
-        # Competition leaderboard: 1 request, skip entire comp if player absent
-        comp_rank, _ = fetch_competition_leaderboard_position(access_token, comp_id, player_id)
-        if comp_rank is None:
-            # Player didn't participate — skip all further API calls for this comp
-            time.sleep(0.1)
-            continue
-
-        # STEP 2: Get rounds (needed for qual challenge + match list)
-        rounds = fetch_rounds(access_token, comp_id)
-        if not rounds:
-            continue
-        round_ = rounds[0]
-        round_id = round_["id"]
-        challenge_id = round_.get("qualifierChallengeId")
-
-        # STEP 3: Qual leaderboard — use comp_rank as hint to jump to right page
-        player_qual, total_players = fetch_qual_leaderboard_for_player(
-            access_token, challenge_id, player_id, approx_rank=comp_rank
-        )
-
-        # STEP 4: Find which division match the player was in
-        # Estimate which division based on qual rank to skip irrelevant matches
-        div = None
-        rank = None
-        div_rank = None
-        matches = fetch_matches(access_token, round_id)
-
-        # Sort matches by position so div 1 = position 0 comes first
-        matches_sorted = sorted(matches, key=lambda m: m.get("position", 0))
-
-        for match in matches_sorted:
-            comp_match_id = match["id"]
-            match_name = match.get("name", "")
-            div_from_name = re.search(r"[Dd]ivision\s*(\d+)", match_name)
-
-            player_match = fetch_match_results(access_token, comp_match_id, player_id)
-            if player_match:
-                if div_from_name:
-                    div = int(div_from_name.group(1))
-                else:
-                    div = match.get("position", 0) + 1
-                rank = player_match["rank"]
-                div_rank = player_match["rank"]
-                break
-            time.sleep(0.1)
-
-        results.append({
-            "id": comp_id,
-            "timestamp": timestamp,
-            "name": name,
-            "edition": edition_num,
-            "div": div,
-            "rank": rank,
-            "div_rank": div_rank,
-            "qual_score": player_qual["score"] if player_qual else None,
-            "qual_rank": player_qual["rank"] if player_qual else None,
-            "total_players": total_players,
-            "type": type_
-        })
-        time.sleep(0.2)
+    # Run up to 5 competitions in parallel — respects ~2 req/s per thread guideline
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {
+            executor.submit(process_one_comp, comp, access_token, player_id): comp
+            for comp in competitions
+        }
+        for future in as_completed(futures):
+            done += 1
+            comp = futures[future]
+            status_text.text(f"[{done}/{total}] Hittade {len(results)} resultat hittills…")
+            try:
+                result = future.result()
+                if result is not None:
+                    results.append(result)
+            except Exception:
+                pass  # Skip failed comps silently
 
     return results
 
