@@ -139,6 +139,7 @@ def fetch_player_cotd_history(player_id):
     No auth required — trackmania.io is public.
     """
     results = []
+    total_cups = None  # fetched once from page 0, reused for all subsequent pages
     page = 0
     while True:
         url = f"https://trackmania.io/api/player/{player_id}/cotd/{page}"
@@ -149,31 +150,40 @@ def fetch_player_cotd_history(player_id):
         if resp.status_code != 200:
             break
         data = resp.json()
-        cotds = data.get("cotds", [])
-        if not cotds:
+
+        # stats.total only present on page 0 — capture it once
+        if total_cups is None:
+            total_cups = data.get("stats", {}).get("total", 0)
+
+        cups = data.get("cups", [])
+        if not cups:
             break
-        for entry in cotds:
+
+        for entry in cups:
             name = entry.get("name", "")
             edition_match = re.search(r"#(\d+)", name)
             edition_num = int(edition_match.group(1)) if edition_match else 1
             type_ = "Primary" if edition_num == 1 else "Rerun"
-            timestamp = pd.to_datetime(entry.get("timestamp", 0), unit="s", utc=True)
+            timestamp = pd.to_datetime(entry.get("timestamp"), utc=True)
             results.append({
                 "id": entry.get("id"),
                 "timestamp": timestamp,
                 "name": name,
+                "mapname": re.sub(r"\$[0-9a-fA-F]{3}|\$[oiszwntgLHPOISZWNTGlhpsSiI$]", "", entry.get("mapname", "")),
                 "edition": edition_num,
                 "div": entry.get("div"),
-                "rank": entry.get("rank"),
+                "rank": entry.get("qualificationrank"),
                 "div_rank": entry.get("divrank"),
                 "qual_score": entry.get("score"),
-                "qual_rank": entry.get("rank"),   # overall rank = qual rank on tmio
+                "qual_rank": entry.get("qualificationrank"),
                 "total_players": entry.get("totalplayers"),
                 "type": type_
             })
-        # Check if there are more pages
-        total = data.get("total", 0)
-        if len(results) >= total or len(cotds) < 25:
+
+        # Stop when we have everything or the last page was not full
+        if total_cups and len(results) >= total_cups:
+            break
+        if len(cups) < 25:
             break
         page += 1
         time.sleep(0.2)
