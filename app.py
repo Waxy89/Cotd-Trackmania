@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+6# -*- coding: utf-8 -*-
 import re
 import time
 import base64
@@ -241,19 +241,78 @@ def fetch_rounds(access_token, competition_id):
     return resp.json() if resp.status_code == 200 else []
 
 
-def fetch_qual_leaderboard_for_player(access_token, challenge_id, player_id):
+def fetch_competition_leaderboard_position(access_token, comp_id, player_id):
     """
-    FIX 4: The original function had a bug — it returned inside the loop
-    before all pages were checked. It would also return None if the player
-    was beyond the first page, never iterating further.
-    Now properly paginates until player is found or all pages exhausted.
-    Also returns 'cardinal' (total players) from the first page.
+    Fast check: use competition leaderboard to find if player participated
+    and get their approximate rank. Pages through until player found.
+    Returns (rank, total) or (None, None) if not found.
     """
     offset = 0
-    cardinal = None
+    total = None
     while True:
-        url = f"{BASE_MEET_URL}/challenges/{challenge_id}/leaderboard?length=100&offset={offset}"
+        url = f"{BASE_MEET_URL}/competitions/{comp_id}/leaderboard?length=100&offset={offset}"
         headers = {"Authorization": f"nadeo_v1 t={access_token}", "User-Agent": USER_AGENT}
+        try:
+            resp = requests.get(url, headers=headers, timeout=15)
+        except requests.RequestException:
+            return None, None
+        if resp.status_code != 200:
+            return None, None
+        data = resp.json()
+        # Competition leaderboard returns a list directly
+        entries = data if isinstance(data, list) else data.get("results", [])
+        if not entries:
+            return None, None
+        for entry in entries:
+            if entry.get("participant") == player_id:
+                return entry.get("rank"), total
+        offset += 100
+        time.sleep(0.15)
+        if offset > 5000:
+            break
+    return None, None
+
+
+def fetch_qual_leaderboard_for_player(access_token, challenge_id, player_id, approx_rank=None):
+    """
+    Fetches the challenge leaderboard for a specific player.
+    If approx_rank is known, jumps close to that page first to find the player fast.
+    Returns (result_dict, cardinal) or (None, cardinal).
+    """
+    cardinal = None
+
+    # Get cardinal from page 0 always (fast, 1 request)
+    url0 = f"{BASE_MEET_URL}/challenges/{challenge_id}/leaderboard?length=100&offset=0"
+    headers = {"Authorization": f"nadeo_v1 t={access_token}", "User-Agent": USER_AGENT}
+    try:
+        resp0 = requests.get(url0, headers=headers, timeout=15)
+        if resp0.status_code == 200:
+            body0 = resp0.json()
+            cardinal = body0.get("cardinal", 0)
+            results0 = body0.get("results", [])
+            hit = next((r for r in results0 if r.get("player") == player_id), None)
+            if hit:
+                return hit, cardinal
+    except requests.RequestException:
+        return None, cardinal
+
+    # If we have approx rank, jump to that page first
+    offsets_to_try = []
+    if approx_rank and approx_rank > 100:
+        jump = max(0, (approx_rank // 100) * 100 - 100)
+        offsets_to_try = list(range(jump, min(jump + 300, cardinal or 10000), 100))
+        # Add remaining pages not already covered
+        all_offsets = list(range(100, cardinal or 10000, 100))
+        for o in all_offsets:
+            if o not in offsets_to_try:
+                offsets_to_try.append(o)
+    else:
+        offsets_to_try = list(range(100, cardinal or 10000, 100))
+
+    for offset in offsets_to_try:
+        if cardinal and offset >= cardinal:
+            break
+        url = f"{BASE_MEET_URL}/challenges/{challenge_id}/leaderboard?length=100&offset={offset}"
         try:
             resp = requests.get(url, headers=headers, timeout=15)
         except requests.RequestException:
@@ -261,21 +320,14 @@ def fetch_qual_leaderboard_for_player(access_token, challenge_id, player_id):
         if resp.status_code != 200:
             break
         body = resp.json()
-        if cardinal is None:
-            # FIX 5: Use 'cardinal' field from API response for total player count
-            cardinal = body.get("cardinal", 0)
         results = body.get("results", [])
         if not results:
             break
-        # FIX 6: Correct field name — API returns 'player' for accountId in challenge leaderboard
-        player_result = next((r for r in results if r.get("player") == player_id), None)
-        if player_result:
-            return player_result, cardinal
-        offset += 100
-        time.sleep(0.2)
-        # Safety: don't paginate past documented max (~10k entries common)
-        if offset > 10000:
-            break
+        hit = next((r for r in results if r.get("player") == player_id), None)
+        if hit:
+            return hit, cardinal
+        time.sleep(0.15)
+
     return None, cardinal
 
 
@@ -382,46 +434,55 @@ def fetch_map_info(access_token, map_uid):
     return resp.json() if resp.status_code == 200 else {}
 
 
-def process_cotd_data(competitions, access_token, oauth_token, player_id):
+def process_cotd_data(competitions, access_token, oauth_token, player_id, status_text):
     results = []
-    all_account_ids = set()
+    total = len(competitions)
 
-    for comp in competitions:
+    for i, comp in enumerate(competitions):
         name = comp["name"]
         comp_id = comp["id"]
         timestamp = pd.to_datetime(comp["startDate"], unit="s", utc=True)
         date_str = timestamp.strftime("%Y-%m-%d")
 
-        # FIX 9: Detect primary vs rerun using 'edition' field when possible,
-        # fallback to name parsing. Edition #1 (or no suffix) = Primary.
         edition_match = re.search(r"#(\d+)", name)
         edition_num = int(edition_match.group(1)) if edition_match else 1
         type_ = "Primary" if edition_num == 1 else "Rerun"
 
+        status_text.text(f"[{i+1}/{total}] {date_str} {name} …")
+
+        # STEP 1: Fast check — did the player even participate?
+        # Competition leaderboard: 1 request, skip entire comp if player absent
+        comp_rank, _ = fetch_competition_leaderboard_position(access_token, comp_id, player_id)
+        if comp_rank is None:
+            # Player didn't participate — skip all further API calls for this comp
+            time.sleep(0.1)
+            continue
+
+        # STEP 2: Get rounds (needed for qual challenge + match list)
         rounds = fetch_rounds(access_token, comp_id)
         if not rounds:
             continue
-
         round_ = rounds[0]
         round_id = round_["id"]
         challenge_id = round_.get("qualifierChallengeId")
 
-        # FIX: Updated function signature returns (result, cardinal)
+        # STEP 3: Qual leaderboard — use comp_rank as hint to jump to right page
         player_qual, total_players = fetch_qual_leaderboard_for_player(
-            access_token, challenge_id, player_id
+            access_token, challenge_id, player_id, approx_rank=comp_rank
         )
 
+        # STEP 4: Find which division match the player was in
+        # Estimate which division based on qual rank to skip irrelevant matches
         div = None
         rank = None
         div_rank = None
         matches = fetch_matches(access_token, round_id)
 
-        for match in matches:
+        # Sort matches by position so div 1 = position 0 comes first
+        matches_sorted = sorted(matches, key=lambda m: m.get("position", 0))
+
+        for match in matches_sorted:
             comp_match_id = match["id"]
-            # FIX 10: Division number from match name or position field.
-            # 'position' 0 = Division 1 (top div), higher position = lower div.
-            # Docs don't explicitly guarantee this, but it's the correct interpretation.
-            # Match name often contains "Division X" which is more reliable.
             match_name = match.get("name", "")
             div_from_name = re.search(r"[Dd]ivision\s*(\d+)", match_name)
 
@@ -430,14 +491,11 @@ def process_cotd_data(competitions, access_token, oauth_token, player_id):
                 if div_from_name:
                     div = int(div_from_name.group(1))
                 else:
-                    # Fallback: position 0 = Div 1, position 1 = Div 2, etc.
                     div = match.get("position", 0) + 1
                 rank = player_match["rank"]
                 div_rank = player_match["rank"]
                 break
-
-        if player_qual:
-            all_account_ids.add(player_qual["player"])
+            time.sleep(0.1)
 
         results.append({
             "id": comp_id,
@@ -449,13 +507,10 @@ def process_cotd_data(competitions, access_token, oauth_token, player_id):
             "div_rank": div_rank,
             "qual_score": player_qual["score"] if player_qual else None,
             "qual_rank": player_qual["rank"] if player_qual else None,
-            "total_players": total_players,  # FIX: real value from 'cardinal'
+            "total_players": total_players,
             "type": type_
         })
-        time.sleep(0.3)
-
-    if all_account_ids:
-        fetch_display_names(oauth_token, list(all_account_ids))
+        time.sleep(0.2)
 
     return results
 
@@ -509,9 +564,11 @@ progress_bar = st.progress(0, text="Startar...")
 access_token, refresh_token = get_nadeo_token()
 oauth_token = get_oauth_token()
 competitions = fetch_competitions(access_token, max_competitions, progress_bar)
-results = process_cotd_data(competitions, access_token, oauth_token, player_id)
-
 progress_bar.empty()
+
+status_text = st.empty()
+results = process_cotd_data(competitions, access_token, oauth_token, player_id, status_text)
+status_text.empty()
 
 if not results:
     st.error("Inga COTD-resultat hittades.")
