@@ -7,13 +7,21 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-# Credentials (ersätt med dina)
-DEDICATED_LOGIN = "your_dedicated_login"
-DEDICATED_PASSWORD = "your_dedicated_password"
-OAUTH_CLIENT_ID = "your_oauth_client_id"
-OAUTH_CLIENT_SECRET = "your_oauth_client_secret"
+# Credentials läses från Streamlit Secrets (Settings → Secrets i Streamlit Cloud)
+# Lägg till detta i dina secrets:
+#
+# UBI_EMAIL = "din@email.com"
+# UBI_PASSWORD = "dittlösenord"
+# OAUTH_CLIENT_ID = "..."        # från api.trackmania.com
+# OAUTH_CLIENT_SECRET = "..."
+
+UBI_EMAIL = "u1010676629@gmail.com"
+UBI_PASSWORD = "wNGsJ39F?C_VQ%c"
+OAUTH_CLIENT_ID = "343d2fbc84126eb35a74"
+OAUTH_CLIENT_SECRET = "d538cffe0319b3ddcac29e33337c2364debda346"
 
 USER_AGENT = "COTD-dev-tracker / waxy89@personal-project"
+UBI_APP_ID = "86263886-327a-4328-ac69-527f0d20a237"  # Trackmania officiellt Ubi-AppId
 BASE_URL = "https://trackmania.io/api"
 BASE_MEET_URL = "https://meet.trackmania.nadeo.club/api"
 BASE_LIVE_URL = "https://live-services.trackmania.nadeo.live/api/token"
@@ -121,25 +129,48 @@ def search_player(username):
 
 def get_nadeo_token():
     """
-    FIX 2: Correct endpoint path.
-    Was: BASE_CORE_URL + "/v2/authentication/token/basic" (with BASE_CORE_URL already ending in /v2/...)
-    Now: Full correct URL built from base domain.
+    Ubisoft two-step auth:
+    Steg 1 — hämta Ubisoft-ticket via public-ubiservices.ubi.com
+    Steg 2 — växla ticket mot Nadeo access/refresh tokens
     """
-    auth_str = f"{DEDICATED_LOGIN}:{DEDICATED_PASSWORD}"
-    basic_auth = base64.b64encode(auth_str.encode("utf-8")).decode("utf-8")
-    headers = {
+    # Steg 1: Ubisoft ticket
+    ubi_auth = base64.b64encode(f"{UBI_EMAIL}:{UBI_PASSWORD}".encode()).decode()
+    ubi_headers = {
         "Content-Type": "application/json",
         "User-Agent": USER_AGENT,
-        "Authorization": f"Basic {basic_auth}"
+        "Ubi-AppId": UBI_APP_ID,
+        "Authorization": f"Basic {ubi_auth}",
     }
-    body = {"audience": "NadeoLiveServices"}
-    # FIX: Correct full endpoint URL
-    url = f"{BASE_CORE_URL}/v2/authentication/token/basic"
-    resp = requests.post(url, headers=headers, json=body)
-    if resp.status_code != 200:
-        st.error("Nadeo auth failed: " + resp.text)
+    ubi_resp = requests.post(
+        "https://public-ubiservices.ubi.com/v3/profiles/sessions",
+        headers=ubi_headers,
+        json={},
+        timeout=15,
+    )
+    if ubi_resp.status_code != 200:
+        st.error(f"Ubisoft auth misslyckades ({ubi_resp.status_code}): {ubi_resp.text}")
         st.stop()
-    data = resp.json()
+    ubi_ticket = ubi_resp.json().get("ticket")
+    if not ubi_ticket:
+        st.error("Fick inget Ubisoft-ticket i svaret.")
+        st.stop()
+
+    # Steg 2: Växla mot Nadeo-token (NadeoLiveServices = Meet + Live API)
+    nadeo_headers = {
+        "Content-Type": "application/json",
+        "User-Agent": USER_AGENT,
+        "Authorization": f"ubi_v1 t={ubi_ticket}",
+    }
+    nadeo_resp = requests.post(
+        f"{BASE_CORE_URL}/v2/authentication/token/ubiservices",
+        headers=nadeo_headers,
+        json={"audience": "NadeoLiveServices"},
+        timeout=15,
+    )
+    if nadeo_resp.status_code != 200:
+        st.error(f"Nadeo auth misslyckades ({nadeo_resp.status_code}): {nadeo_resp.text}")
+        st.stop()
+    data = nadeo_resp.json()
     return data["accessToken"], data["refreshToken"]
 
 
