@@ -128,6 +128,58 @@ def search_player(username):
     return None, None
 
 
+def fetch_player_cotd_history(player_id):
+    """
+    Fetches ALL of a player's COTD results directly from trackmania.io.
+    Returns a list of result dicts with: id, timestamp, name, div, rank,
+    div_rank, total_players, type — all fields we need, no Nadeo Meet API required.
+    
+    Endpoint: GET https://trackmania.io/api/player/{accountId}/cotd/{page}
+    Each page returns up to 25 results. Page 0 = most recent.
+    No auth required — trackmania.io is public.
+    """
+    results = []
+    page = 0
+    while True:
+        url = f"https://trackmania.io/api/player/{player_id}/cotd/{page}"
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=15)
+        except requests.RequestException:
+            break
+        if resp.status_code != 200:
+            break
+        data = resp.json()
+        cotds = data.get("cotds", [])
+        if not cotds:
+            break
+        for entry in cotds:
+            name = entry.get("name", "")
+            edition_match = re.search(r"#(\d+)", name)
+            edition_num = int(edition_match.group(1)) if edition_match else 1
+            type_ = "Primary" if edition_num == 1 else "Rerun"
+            timestamp = pd.to_datetime(entry.get("timestamp", 0), unit="s", utc=True)
+            results.append({
+                "id": entry.get("id"),
+                "timestamp": timestamp,
+                "name": name,
+                "edition": edition_num,
+                "div": entry.get("div"),
+                "rank": entry.get("rank"),
+                "div_rank": entry.get("divrank"),
+                "qual_score": entry.get("score"),
+                "qual_rank": entry.get("rank"),   # overall rank = qual rank on tmio
+                "total_players": entry.get("totalplayers"),
+                "type": type_
+            })
+        # Check if there are more pages
+        total = data.get("total", 0)
+        if len(results) >= total or len(cotds) < 25:
+            break
+        page += 1
+        time.sleep(0.2)
+    return results
+
+
 def get_nadeo_token():
     """
     Ubisoft two-step auth:
@@ -572,12 +624,11 @@ progress_bar = st.progress(0, text="Startar...")
 
 access_token, refresh_token = get_nadeo_token()
 oauth_token = get_oauth_token()
-competitions = fetch_competitions(access_token, max_competitions, progress_bar)
 progress_bar.empty()
 
-status_text = st.empty()
-results = process_cotd_data(competitions, access_token, oauth_token, player_id, status_text)
-status_text.empty()
+# trackmania.io has a direct player COTD endpoint — no need to iterate competitions
+with st.spinner("Hämtar COTD-historik från trackmania.io…"):
+    results = fetch_player_cotd_history(player_id)
 
 if not results:
     st.error("Inga COTD-resultat hittades.")
