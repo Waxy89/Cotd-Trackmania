@@ -610,7 +610,7 @@ st.markdown('<p class="main-title">COTD & RERUN PROGRESS</p>', unsafe_allow_html
 with st.sidebar:
     username_input = st.text_input("Spelarnamn", value="Waxyhaxxy")
     show_primary = st.checkbox("Visa Main COTD", value=True)
-    show_reruns = st.checkbox("Visa Reruns", value=True)
+    # Reruns ej tillgängliga via trackmania.io API
     max_competitions = st.slider("Max competitions", 1, 3000, 500)
     window_size = st.slider("Glidande medelvärde", 1, 50, 10)
 
@@ -640,6 +640,8 @@ progress_bar.empty()
 with st.spinner("Hämtar COTD-historik från trackmania.io…"):
     results = fetch_player_cotd_history(player_id)
 
+
+
 if not results:
     st.error("Inga COTD-resultat hittades.")
     st.stop()
@@ -649,11 +651,10 @@ if df.empty:
     st.error("Ingen giltig data.")
     st.stop()
 
-filter_types = []
-if show_primary:
-    filter_types.append("Primary")
-if show_reruns:
-    filter_types.append("Rerun")
+filter_types = ["Primary"]  # Only Primary available via trackmania.io
+if not show_primary:
+    st.warning("Ingen data att visa — Main COTD är avvald.")
+    st.stop()
 dfv = df[df["type"].isin(filter_types)].copy()
 if dfv.empty:
     st.warning("Ingen data med valda filter.")
